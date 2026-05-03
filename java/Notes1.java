@@ -1,211 +1,419 @@
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashMap;
+import java.nio.file.*;
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Stream;
+import java.util.Scanner;
 
-/**
- * Future Proof Notes Manager - Version One (CLI)
- * A personal notes manager using text files with YAML headers.
- * Command-line interface version with 'list' command.
- *
- * SETUP REMINDER:
- * Before running the 'list' command, copy the test notes to your notes directory:
- *     cp -r test-notes/* ~/.notes/
- * or create the directory structure:
- *     mkdir -p ~/.notes/notes
- *     cp test-notes/*.md ~/.notes/notes/
- */
 public class Notes1 {
 
-    private static final Path NOTES_DIR = Path.of(System.getProperty("user.home"), ".notes");
+    static final Scanner scanner = new Scanner(System.in);
 
-    /**
-     * Initialize the notes application.
-     */
-    private static Path setup() {
-        // Define the notes directory in HOME
-        // Check if notes directory exists
-        // For CLI version, we don't automatically create it
-        return NOTES_DIR;
-    }
+    static final Path NOTES_DIR = Paths.get(System.getProperty("user.home"), ".notes", "notes");
 
-    /**
-     * Parse YAML front matter from a note file.
-     * Returns a map with metadata.
-     */
-    private static Map<String, String> parseYamlHeader(Path filePath) {
-        Map<String, String> metadata = new HashMap<>();
-        metadata.put("file", filePath.getFileName().toString());
+    static final Path DATASETS_DIR = Paths.get(System.getProperty("user.home"), ".notes", "datasets");
 
-        try {
-            List<String> lines = Files.readAllLines(filePath);
+    public static void main(String[] args) throws IOException {
+        Files.createDirectories(NOTES_DIR);
+        Files.createDirectories(DATASETS_DIR);
 
-            // Check if file starts with YAML front matter
-            if (lines.isEmpty() || !lines.get(0).trim().equals("---")) {
-                metadata.put("title", filePath.getFileName().toString());
-                return metadata;
-            }
+        while (true) {
+            System.out.println("\n=== NoteVault ===");
+            System.out.println("1. Create note");
+            System.out.println("2. Read note");
+            System.out.println("3. Update note");
+            System.out.println("4. Delete note");
+            System.out.println("5. List notes");
+            System.out.println("6. Search notes");
+            System.out.println("7. Add dataset");
+            System.out.println("8. List datasets");
+            System.out.println("9. Preview dataset");
+            System.out.println("10. Delete dataset");
+            System.out.println("0. Exit");
+            System.out.print("Choose: ");
 
-            // Find the closing ---
-            int yamlEnd = -1;
-            for (int i = 1; i < lines.size(); i++) {
-                if (lines.get(i).trim().equals("---")) {
-                    yamlEnd = i;
-                    break;
+            String choice = scanner.nextLine();
+
+            switch (choice) {
+                case "1" -> createNote();
+                case "2" -> readNote();
+                case "3" -> updateNote();
+                case "4" -> deleteNote();
+                case "5" -> listNotes();
+                case "6" -> searchNotes();
+                case "7" -> addDataset();
+                case "8" -> listDatasets();
+                case "9" -> previewDataset();
+                case "10" -> deleteDataset();
+                case "0" -> {
+                    System.out.println("Goodbye!");
+                    return;
                 }
+                default -> System.out.println("Invalid choice.");
             }
-
-            if (yamlEnd == -1) {
-                metadata.put("title", filePath.getFileName().toString());
-                return metadata;
-            }
-
-            // Parse YAML lines (simple parsing for basic key: value pairs)
-            for (int i = 1; i < yamlEnd; i++) {
-                String line = lines.get(i).trim();
-                if (line.contains(":")) {
-                    String[] parts = line.split(":", 2);
-                    String key = parts[0].trim();
-                    String value = parts[1].trim();
-                    metadata.put(key, value);
-                }
-            }
-
-        } catch (IOException e) {
-            metadata.put("error", e.getMessage());
         }
-
-        return metadata;
     }
 
-    /**
-     * List all notes in the notes directory.
-     */
-    private static boolean listNotes(Path notesDir) {
-        // Check if notes directory exists
-        if (!Files.exists(notesDir)) {
-            System.err.println("Error: Notes directory does not exist: " + notesDir);
-            System.err.println("Create it with: mkdir -p ~/.notes/notes");
-            System.err.println("Then copy test notes: cp test-notes/*.md ~/.notes/notes/");
-            return false;
-        }
+    static void createNote() throws IOException {
+        System.out.print("Title: ");
+        String title = scanner.nextLine();
 
-        // Look for notes in the notes directory (or directly in .notes)
-        Path notesSubdir = notesDir.resolve("notes");
-        Path searchDir = Files.exists(notesSubdir) ? notesSubdir : notesDir;
+        System.out.print("Tags comma separated: ");
+        String tags = scanner.nextLine();
 
-        // Find all note files (*.md, *.note, *.txt)
-        List<Path> noteFiles;
-        try (Stream<Path> paths = Files.walk(searchDir, 1)) {
-            noteFiles = paths
-                    .filter(Files::isRegularFile)
-                    .filter(p -> {
-                        String name = p.getFileName().toString();
-                        return name.endsWith(".md") || name.endsWith(".note") || name.endsWith(".txt");
-                    })
-                    .sorted()
-                    .toList();
-        } catch (IOException e) {
-            System.err.println("Error reading notes directory: " + e.getMessage());
-            return false;
-        }
+        System.out.print("Author: ");
+        String author = scanner.nextLine();
 
-        if (noteFiles.isEmpty()) {
-            System.out.println("No notes found in " + notesDir);
-            System.err.println("Copy test notes with: cp test-notes/*.md ~/.notes/");
-            return true;
-        }
+        System.out.print("Status: ");
+        String status = scanner.nextLine();
 
-        // Parse and display notes
-        System.out.println("Notes in " + notesDir + ":");
-        System.out.println("=".repeat(60));
+        System.out.print("Priority: ");
+        String priority = scanner.nextLine();
 
-        for (Path noteFile : noteFiles) {
-            // this should probably be a private method to be re-used
-            Map<String, String> metadata = parseYamlHeader(noteFile);
-            String title = metadata.getOrDefault("title", noteFile.getFileName().toString());
-            String created = metadata.getOrDefault("created", "N/A");
-            String tags = metadata.getOrDefault("tags", "");
+        System.out.println("Enter note content. Type END on a new line to finish:");
 
-            System.out.println("\n" + noteFile.getFileName());
-            System.out.println("  Title: " + title);
-            if (!created.equals("N/A")) {
-                System.out.println("  Created: " + created);
-            }
-            if (!tags.isEmpty()) {
-                System.out.println("  Tags: " + tags);
-            }
-        }
+        StringBuilder body = new StringBuilder();
 
-        System.out.println("\n" + noteFiles.size() + " note(s) found.");
-        return true;
-    }
+        while (true) {
+            String line = scanner.nextLine();
 
-    /**
-     * Display help information.
-     */
-    private static void showHelp() {
-        String helpText = String.format("""
-                Future Proof Notes Manager v0.1
-
-                Usage: java Notes1 [command]
-
-                Available commands:
-                  help    - Display this help information
-                  list    - List all notes in the notes directory
-
-                Notes directory: %s
-
-                Setup:
-                  To test the 'list' command, copy sample notes:
-                    mkdir -p ~/.notes/notes
-                    cp test-notes/*.md ~/.notes/notes/
-                """, NOTES_DIR);
-        System.out.println(helpText.trim());
-    }
-
-    /**
-     * Clean up and exit the application.
-     */
-    private static void finish(int exitCode) {
-        System.exit(exitCode);
-    }
-
-    /**
-     * Main entry point for the notes CLI application.
-     */
-    public static void main(String[] args) {
-        // Setup
-        Path notesDir = setup();
-
-        // Parse command-line arguments
-        if (args.length < 1) {
-            // No command provided
-            System.err.println("Error: No command provided.");
-            System.err.println("Usage: java Notes1 [command]");
-            System.err.println("Try 'java Notes1 help' for more information.");
-            finish(1);
-        }
-
-        String command = args[0].toLowerCase();
-
-        // Process command
-        switch (command) {
-            case "help":
-                showHelp();
-                finish(0);
+            if (line.equalsIgnoreCase("END")) {
                 break;
-            case "list":
-                boolean success = listNotes(notesDir);
-                finish(success ? 0 : 1);
-                break;
-            default:
-                System.err.println("Error: Unknown command '" + command + "'");
-                System.err.println("Try 'java Notes1 help' for more information.");
-                finish(1);
+            }
+
+            body.append(line).append("\n");
         }
+
+        String id = makeId(title);
+        String now = Instant.now().toString();
+
+        String note = """
+                ---
+                title: %s
+                created: %s
+                modified: %s
+                tags: [%s]
+                author: %s
+                status: %s
+                priority: %s
+                ---
+
+                # %s
+
+                %s
+                """.formatted(
+                title,
+                now,
+                now,
+                tags,
+                author,
+                status,
+                priority,
+                title,
+                body.toString());
+
+        Files.writeString(
+                NOTES_DIR.resolve(id + ".note"),
+                note,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+
+        System.out.println("Created note: " + id);
+    }
+
+    static void readNote() throws IOException {
+        System.out.print("Enter note id: ");
+        String id = scanner.nextLine();
+
+        Path file = NOTES_DIR.resolve(id + ".note");
+
+        if (!Files.exists(file)) {
+            System.out.println("Note not found.");
+            return;
+        }
+
+        System.out.println("\n" + Files.readString(file));
+    }
+
+    static void updateNote() throws IOException {
+        System.out.print("Enter note id: ");
+        String id = scanner.nextLine();
+
+        Path file = NOTES_DIR.resolve(id + ".note");
+
+        if (!Files.exists(file)) {
+            System.out.println("Note not found.");
+            return;
+        }
+
+        String existing = Files.readString(file);
+
+        System.out.println("Enter new note content. Type END on a new line to finish:");
+
+        StringBuilder body = new StringBuilder();
+
+        while (true) {
+            String line = scanner.nextLine();
+
+            if (line.equalsIgnoreCase("END")) {
+                break;
+            }
+
+            body.append(line).append("\n");
+        }
+
+        String updated = existing.replaceFirst(
+                "modified: .*",
+                "modified: " + Instant.now());
+
+        String[] parts = updated.split("---", 3);
+
+        if (parts.length == 3) {
+            updated = "---" + parts[1] + "---\n\n" + body;
+        } else {
+            updated = body.toString();
+        }
+
+        Files.writeString(
+                file,
+                updated,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+
+        System.out.println("Updated note.");
+    }
+
+    static void deleteNote() throws IOException {
+        System.out.print("Enter note id: ");
+        String id = scanner.nextLine();
+
+        Path file = NOTES_DIR.resolve(id + ".note");
+
+        if (Files.deleteIfExists(file)) {
+            System.out.println("Deleted note.");
+        } else {
+            System.out.println("Note not found.");
+        }
+    }
+
+    static void listNotes() throws IOException {
+        System.out.println("\n--- Notes ---");
+
+        try (var stream = Files.list(NOTES_DIR)) {
+            stream.filter(path -> path.toString().endsWith(".note"))
+                    .forEach(path -> System.out.println(
+                            path.getFileName().toString().replace(".note", "")));
+        }
+    }
+
+    static void searchNotes() throws IOException {
+        System.out.print("Search text: ");
+        String query = scanner.nextLine().toLowerCase();
+
+        System.out.println("\n--- Search Results ---");
+
+        try (var stream = Files.list(NOTES_DIR)) {
+            stream.filter(path -> path.toString().endsWith(".note"))
+                    .forEach(path -> {
+                        try {
+                            String content = Files.readString(path).toLowerCase();
+
+                            if (content.contains(query)) {
+                                System.out.println(
+                                        path.getFileName().toString().replace(".note", ""));
+                            }
+                        } catch (IOException ignored) {
+                        }
+                    });
+        }
+    }
+
+    static void addDataset() throws IOException {
+        System.out.print("Enter CSV/JSON file path: ");
+        String inputPath = scanner.nextLine();
+
+        Path source = Paths.get(inputPath);
+
+        if (!Files.exists(source)) {
+            System.out.println("File not found.");
+            return;
+        }
+
+        String fileName = source.getFileName().toString();
+
+        if (!fileName.endsWith(".csv") && !fileName.endsWith(".json")) {
+            System.out.println("Only .csv and .json files allowed.");
+            return;
+        }
+
+        System.out.print("Dataset title: ");
+        String title = scanner.nextLine();
+
+        System.out.print("Author: ");
+        String author = scanner.nextLine();
+
+        System.out.print("Tags comma separated: ");
+        String tags = scanner.nextLine();
+
+        Path destination = DATASETS_DIR.resolve(fileName);
+
+        Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING);
+
+        String id = fileName.replace(".csv", "").replace(".json", "");
+        String format = fileName.endsWith(".csv") ? "csv" : "json";
+        String now = Instant.now().toString();
+
+        long rowCount = countRows(destination, format);
+        String schema = inferSchema(destination, format);
+
+        String metadata = """
+                id: %s
+                title: %s
+                author: %s
+                created: %s
+                modified: %s
+                tags: [%s]
+                format: %s
+                path: %s
+                rowCount: %d
+                schema:
+                %s
+                """.formatted(
+                id,
+                title,
+                author,
+                now,
+                now,
+                tags,
+                format,
+                fileName,
+                rowCount,
+                schema);
+
+        Files.writeString(
+                DATASETS_DIR.resolve(id + ".dataset.yml"),
+                metadata,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+
+        System.out.println("Dataset added: " + id);
+    }
+
+    static void listDatasets() throws IOException {
+        System.out.println("\n--- Datasets ---");
+
+        try (var stream = Files.list(DATASETS_DIR)) {
+            stream.filter(path -> path.toString().endsWith(".dataset.yml"))
+                    .forEach(path -> System.out.println(
+                            path.getFileName().toString().replace(".dataset.yml", "")));
+        }
+    }
+
+    static void previewDataset() throws IOException {
+        System.out.print("Enter dataset file name, example sales.csv: ");
+        String fileName = scanner.nextLine();
+
+        Path file = DATASETS_DIR.resolve(fileName);
+
+        if (!Files.exists(file)) {
+            System.out.println("Dataset not found.");
+            return;
+        }
+
+        System.out.println("\n--- Preview ---");
+
+        try (var lines = Files.lines(file)) {
+            lines.limit(10).forEach(System.out::println);
+        }
+    }
+
+    static void deleteDataset() throws IOException {
+        System.out.print("Enter dataset id: ");
+        String id = scanner.nextLine();
+
+        boolean deletedCsv = Files.deleteIfExists(DATASETS_DIR.resolve(id + ".csv"));
+        boolean deletedJson = Files.deleteIfExists(DATASETS_DIR.resolve(id + ".json"));
+        boolean deletedMeta = Files.deleteIfExists(DATASETS_DIR.resolve(id + ".dataset.yml"));
+
+        if (deletedCsv || deletedJson || deletedMeta) {
+            System.out.println("Dataset deleted.");
+        } else {
+            System.out.println("Dataset not found.");
+        }
+    }
+
+    static long countRows(Path file, String format) throws IOException {
+        if (format.equals("csv")) {
+            try (var lines = Files.lines(file)) {
+                long count = lines.count();
+                return Math.max(0, count - 1);
+            }
+        }
+
+        String content = Files.readString(file).trim();
+
+        if (content.startsWith("[")) {
+            return content.split("\\{").length - 1;
+        }
+
+        return 1;
+    }
+
+    static String inferSchema(Path file, String format) throws IOException {
+        if (format.equals("csv")) {
+            List<String> lines = Files.readAllLines(file);
+
+            if (lines.isEmpty()) {
+                return "  []";
+            }
+
+            String[] headers = lines.get(0).split(",");
+            String[] sample = lines.size() > 1 ? lines.get(1).split(",") : new String[0];
+
+            StringBuilder schema = new StringBuilder();
+
+            for (int i = 0; i < headers.length; i++) {
+                String name = headers[i].trim();
+                String value = i < sample.length ? sample[i].trim() : "";
+                String type = inferType(value);
+
+                schema.append("  - name: ").append(name).append("\n");
+                schema.append("    type: ").append(type).append("\n");
+            }
+
+            return schema.toString();
+        }
+
+        return """
+                  - name: json_document
+                    type: object
+                """;
+    }
+
+    static String inferType(String value) {
+        if (value.matches("-?\\d+")) {
+            return "integer";
+        }
+
+        if (value.matches("-?\\d+\\.\\d+")) {
+            return "decimal";
+        }
+
+        if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
+            return "boolean";
+        }
+
+        return "string";
+    }
+
+    static String makeId(String title) {
+        String id = title.toLowerCase()
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("^-|-$", "");
+
+        if (id.isBlank()) {
+            id = "note-" + System.currentTimeMillis();
+        }
+
+        return id;
     }
 }
